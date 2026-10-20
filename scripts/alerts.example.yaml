@@ -1,0 +1,9 @@
+# Copy to scripts/alerts.yaml (git-ignored) and fill in. Used by scripts/alerts.py; see docs/alerts_runbook.md.
+subscription: 00000000-0000-0000-0000-000000000000
+resource_group: <rg holding the alert rules, identity and action group>
+location: eastus                     # must equal the Log Analytics workspace's region
+workspace_id: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<name>
+workspace_customer_id: 00000000-0000-0000-0000-000000000000   # the workspace's "Workspace ID" (for `test`)
+identity_id: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/finops-alerts-id
+action_group_id: /subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.insights/actionGroups/finops-alerts-email
+adx_cluster_uri: https://<cluster>.<region>.kusto.windows.net

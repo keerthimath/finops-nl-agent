@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.chainlit/
+.files/
+dist/
+build/
+*.egg-info/
+scripts/teams*.yaml
+!scripts/teams.example.yaml
+infra/*.local.json
+dashboards/*.json
+scripts/*.log
+scripts/alerts.yaml
+scripts/.alert-*.json

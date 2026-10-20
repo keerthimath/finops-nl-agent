@@ -1,0 +1,35 @@
+# Copy to scripts/teams.yaml (gitignored) and fill in.
+
+# Database that holds the cost table. In FinOps Hub the final cost table is in the Ingestion database.
+# Confirm the real database and table name in your cluster before applying.
+table_database: Ingestion
+table: Costs_final_v1_2
+function_name: FinopsRls_Costs
+
+# Databases where each listed principal is granted Database Viewer. Users query through functions in Hub, which read
+# the Ingestion table, so they typically need Viewer on both. Confirm in non-prod.
+viewer_databases: [Hub, Ingestion]
+
+# SubAccountId holds the subscription ARM path. Use the exact strings from `Costs_v1_2() | distinct SubAccountId`
+# (case-insensitive) in the lists below, not bare GUIDs. `rls_runbook.py preflight` checks they exist.
+subscription_column: SubAccountId
+
+# Principals that always see everything. MUST include your FinOps admins and the identity that runs hub
+# ingestion / ADF, AND whoever runs the runbook (the safety check compares what you see before and after).
+allow_all:
+  - "aadgroup=00000000-0000-0000-0000-000000000000;11111111-1111-1111-1111-111111111111"
+  - "aadapp=22222222-2222-2222-2222-222222222222;11111111-1111-1111-1111-111111111111"
+
+teams:
+  # One entry per subscription; add every authorized user/group to principals.
+  - name: subscription-name
+    principals:
+      - "aaduser=<objectId>;<tenantId>"
+      - "aadgroup=<objectId>;<tenantId>"
+    subscriptions:
+      - "/subscriptions/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+  - name: another-subscription
+    principals:
+      - "aadgroup=<objectId>;<tenantId>"
+    subscriptions:
+      - "/subscriptions/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"

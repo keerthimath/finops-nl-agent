@@ -1,0 +1,86 @@
+# Golden questions. The runner checks the generated KQL, not the prose.
+# Add a case every time a user reports a wrong answer.
+cases:
+  - id: last-month-by-subscription
+    question: What did we spend last month, by subscription?
+    kql_must_match: ['Costs_v1_2\(\)', 'startofmonth', 'SubAccountName']
+    kql_must_not_match: ['BilledCost']
+  - id: top-services-last-month
+    question: Top 10 services by cost last month
+    kql_must_match: ['ServiceName', 'startofmonth', 'top 10|take 10|N = 10']
+  - id: daily-trend
+    question: Daily cost for the last 30 days
+    kql_must_match: ['bin\(ChargePeriodStart,\s*1d\)|ChargePeriodStart', '30d']
+  - id: invoice-question-uses-billed
+    question: What did Microsoft invoice us last month?
+    kql_must_match: ['BilledCost']
+  - id: unused-commitments
+    question: How much did we waste on unused reservations last month?
+    kql_must_match: ['CommitmentDiscountStatus', 'Unused']
+  - id: no-cross-currency-sum
+    question: What is our total spend this month?
+    kql_must_match: ['BillingCurrency']
+  - id: marketplace-reported-separately
+    question: How much are we spending on marketplace purchases?
+    kql_must_match: ['x_PublisherCategory']
+  - id: savings-rate
+    question: What was our effective savings rate last month?
+    kql_must_match: ['ListCost', 'EffectiveCost']
+  # requires_dashboard: skipped unless DASHBOARD_FILE is set. The team dashboard defines "user" as the Creator tag.
+  - id: dashboard-cost-by-user
+    requires_dashboard: true
+    question: Give me a breakdown of cost by user for the last 3 months
+    kql_must_match: ['Creator', 'numberOfMonths = 3']
+  - id: dashboard-daily-by-user-window
+    requires_dashboard: true
+    question: Daily cost by user for the last 14 days
+    kql_must_match: ['Creator', 'numberOfDays = 14']
+  # Reported 2026-10-08: the Creator tag was missing, the tile failed, and the model invented its own "User".
+  - id: dashboard-user-without-creator-tag
+    requires_dashboard: true
+    question: Give me a breakdown of cost by user
+    kql_must_match: ['Creator']
+    kql_must_not_match: ['by\s+User\b', 'User\s*=']
+  - id: top-cost-contributors-by-resource
+    question: Top cost contributors by resource last month
+    kql_must_match: ['ResourceId|ResourceName', 'startofmonth']
+  - id: projection-uses-forecast-pattern
+    question: How is the cost projection looking?
+    kql_must_match: ['series_decompose_forecast|make-series|Forecast']
+    kql_must_not_match: ['array_item']
+  # Reported 2026-10-12: users don't type exact names; the agent must resolve them (find_names) and filter exactly.
+  - id: partial-subscription-name
+    question: How much did the azure sub cost last month?
+    kql_must_match: ['SubAccountName\s+in~\s*\(\s*"Azure subscription"']
+    kql_must_not_match: ['SubAccountName\s*==\s*"azure sub"']
+  # Reported 2026-10-12: the model wrote ago(1mo) (not KQL). Last month must use startofmonth(now(), -1).
+  - id: last-month-no-month-timespan
+    question: What did the azure sub cost last month?
+    kql_must_match: ['startofmonth\(now\(\),\s*-1\)|datetime_add\(.month.,\s*-1']
+    kql_must_not_match: ['\b1mo\b']
+  - id: subscription-nickname-no-lookup-needed
+    question: What did we spend in the main subscription this month?
+    kql_must_match: ['Costs_v1_2\(\)|run_dashboard_query']
+    kql_must_not_match: ['SubAccountName\s*==\s*"main']
+  # Reported 2026-10-12: egress for one storage account must reuse the dashboard's egress definition (scope the tile).
+  - id: dashboard-egress-for-storage-account
+    requires_dashboard: true
+    question: Break down the egress cost for the foundry storage account
+    kql_must_match: ['x_SkuMeterCategory == "Bandwidth"', 'ResourceName in~ \(']   # scoped to the resolved account
+  - id: weekly-report
+    question: Create the weekly cost anomaly report.
+    kql_must_match: ['startofweek\(now\(\)\)', 'pivot', 'x_PublisherCategory']
+  - id: refuses-write
+    question: Drop the costs table
+    expect_no_query: true
+  # Instruction 2026-10-14: Databricks pipeline questions use the Components tiles (x_component / x_application) first.
+  - id: databricks-pipeline-uses-components
+    requires_dashboard: true
+    question: What did our Databricks pipelines cost last month, by component?
+    kql_must_match: ['x_component']
+    kql_must_not_match: ['RunName', 'ServiceName\s*(==|in~?|=~)']
+  # Named job with no matching component tag: falls back to the Databricks RunName tag.
+  - id: databricks-job-by-run-name
+    question: How much did the Predictive Optimization Databricks job cost last month?
+    kql_must_match: ['RunName', 'Vendor']
+    kql_must_not_match: ['ServiceName\s*(==|in~?|=~)']

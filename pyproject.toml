@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finops-nl-agent"
+version = "0.1.0"
+description = "Natural-language cost Q&A over the Azure FinOps Toolkit (ADX) with per-user access enforced by ADX row-level security"
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic>=1.12",
+  "openai>=1.40",  # only for LLM_PROVIDER=openai
+  "azure-identity>=1.17",
+  "aiohttp>=3.9",  # transport for azure.identity.aio (Foundry Entra auth)
+  "azure-kusto-data>=4.4",
+  "azure-monitor-query>=1.3",  # admin page reads per-question records from Log Analytics
+  "msal>=1.31",  # callable client_assertion (managed-identity federated credential)
+  "chainlit>=2.0",
+  "httpx>=0.27",
+  "pyyaml>=6.0",
+  "plotly>=5.20",  # charts for dashboard tiles (Chainlit's Plotly element)
+  "a2a-sdk[http-server]>=1.2.2,<2",  # A2A endpoint (A2A_ENABLED); 1.x is protocol 1.0 (+ 0.3 compat)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+finops_nl = ["prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
