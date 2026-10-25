@@ -41,6 +41,18 @@ class RlsAllTests(unittest.TestCase):
         problems = rls_all.check(rls_all.config_paths(self.d))
         self.assertTrue(any("same table" in p for p in problems))
 
+    def test_advice_prefers_groups_and_one_entry_per_team(self):
+        user = "aaduser=44444444-4444-4444-4444-444444444444;22222222-2222-2222-2222-222222222222"
+        same = dict(TEAM, name="b", subscriptions=["/subscriptions/bbbb"])
+        solo = {"name": "c", "principals": [user], "subscriptions": ["/subscriptions/cccc"]}
+        d = tempfile.mkdtemp()
+        self.write(d, "teams.yaml", "Costs_final_v1_2", "FinopsRls_Costs", teams=[TEAM, same, solo])
+        notes = rls_all.advice(rls_all.config_paths(d))
+        self.assertEqual(len(notes), 2)
+        self.assertIn("team 'c': 1 individual user", notes[0])
+        self.assertIn("teams 'a', 'b' have the same principals", notes[1])
+        self.assertEqual(rls_all.advice(rls_all.config_paths(self.d)), [])  # one group per team: nothing to say
+
     def test_invalid_config_and_none(self):
         self.write(self.d, "teams_bad.yaml", "T", "F", allow=())
         self.assertTrue(any("allow_all" in p for p in rls_all.check(rls_all.config_paths(self.d))))

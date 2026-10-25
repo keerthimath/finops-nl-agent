@@ -21,15 +21,18 @@ allow_all:
   - "aadapp=22222222-2222-2222-2222-222222222222;11111111-1111-1111-1111-111111111111"
 
 teams:
-  # One entry per subscription; add every authorized user/group to principals.
-  - name: subscription-name
+  # One entry per team: an Entra group (membership is managed in Entra, so people joining or leaving need no RLS
+  # redeploy) and every subscription the team may see. A subscription shared by two teams goes in both entries;
+  # someone in several teams sees all of their teams' subscriptions. Use individual users (aaduser=) only for
+  # exceptions; `rls_all.py check` notes them.
+  - name: team-a
     principals:
-      - "aaduser=<objectId>;<tenantId>"
-      - "aadgroup=<objectId>;<tenantId>"
+      - "aadgroup=<teamAGroupObjectId>;<tenantId>"
     subscriptions:
       - "/subscriptions/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-  - name: another-subscription
-    principals:
-      - "aadgroup=<objectId>;<tenantId>"
-    subscriptions:
       - "/subscriptions/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  - name: team-b
+    principals:
+      - "aadgroup=<teamBGroupObjectId>;<tenantId>"
+    subscriptions:
+      - "/subscriptions/cccccccc-cccc-cccc-cccc-cccccccccccc"

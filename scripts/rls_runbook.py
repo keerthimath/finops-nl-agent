@@ -114,6 +114,10 @@ def preflight(runner, p: gen_rls.Plan, cfg: dict) -> int:
     rows, subs = _count(runner, p)
     print(f"    {rows} rows, {subs} distinct values")
     _step(7, f"Do the subscriptions in your config exist in {p.col}? (matching is case-insensitive)")
+    if rows == 0:
+        print("    table is empty: nothing to compare (not an error). Re-run preflight once it has data.")
+        print("\nPreflight done. Review steps 1-5 yourself; fix anything above before running `apply`.")
+        return 0
     found = {str(r["v"]).lower() for r in runner.run(p.table_db, f"{p.table} | summarize by v=tolower(tostring({p.col}))")}
     problems = 0
     for t in p.teams:

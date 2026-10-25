@@ -67,6 +67,28 @@ def check(paths: list[str]) -> list[str]:
     return problems
 
 
+def advice(paths: list[str]) -> list[str]:
+    """Style warnings for the agreed configs (never blocking). The recommended model is one entry per team: an Entra
+    group listing all of the team's subscriptions, so joining or leaving a team is an Entra change, not an RLS deploy."""
+    if not paths:
+        return []
+    p = gen_rls.plan_from_config(load(paths[0]))  # check() made sure every config has the same teams
+    notes = []
+    for t in p.teams:
+        users = [x for x in t["principals"] if x.lower().startswith("aaduser=")]
+        if users:
+            notes.append(f"team '{t['name']}': {len(users)} individual user principal(s); prefer an Entra group so "
+                         "membership changes don't need an RLS redeploy")
+    by_principals: dict[tuple, list[str]] = {}
+    for t in p.teams:
+        by_principals.setdefault(tuple(sorted(x.lower() for x in t["principals"])), []).append(t["name"])
+    for names in by_principals.values():
+        if len(names) > 1:
+            notes.append(f"teams {', '.join(repr(n) for n in names)} have the same principals; merge them into one "
+                         "team listing all their subscriptions")
+    return notes
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("step", choices=("list", "check") + STEPS)
@@ -85,6 +107,8 @@ def main(argv=None) -> int:
         return 1
     if args.step == "check":
         print(f"{len(paths)} configs agree (same allow_all and teams; unique tables and functions).")
+        for note in advice(paths):
+            print(f"  note: {note}")
         return 0
     for path in paths:
         cmd = [sys.executable, os.path.join(HERE, "rls_runbook.py"), args.step, path]

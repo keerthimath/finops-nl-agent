@@ -103,6 +103,13 @@ class RunbookTests(unittest.TestCase):
         self.assertIn("MISSING  B: /subscriptions/bbb", out)
         self.assertIn("ok       A: /subscriptions/aaa", out)
 
+    def test_preflight_passes_on_an_empty_table(self):
+        r = FakeRunner([(0, 0)])  # nothing to match yet: not a config error
+        code, out = run_main(["preflight", "--cluster", "https://x"], r)
+        self.assertEqual(code, 0)
+        self.assertIn("table is empty", out)
+        self.assertNotIn("MISSING", out)
+
     def test_requires_cluster(self):
         with contextlib.redirect_stderr(io.StringIO()):
             code, _ = run_main(["verify", "--cluster", ""], FakeRunner([]))

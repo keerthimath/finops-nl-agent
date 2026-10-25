@@ -36,6 +36,9 @@ tables (check with `.show function Costs_v1_2` in `Hub`). One config per table, 
 | `scripts/teams_v1_0.yaml` | `Costs_final_v1_0` | `FinopsRls_Costs_v1_0` |
 | `scripts/teams_<Name>_<ver>.yaml` | `<Name>_final_<ver>` for Recommendations, Transactions, CommitmentDiscountUsage, `v1_2` and `v1_0` | `FinopsRls_<Name>_<ver>` |
 
+Model teams as **one entry per team**: an Entra group plus every subscription the team may see (see
+`scripts/teams.example.yaml`). Membership then lives in Entra, so people joining or leaving need no redeploy;
+`rls_all.py check` notes individual-user principals and teams that repeat the same principals.
 Keep `allow_all` and `teams` identical in all of them: `python scripts/rls_all.py check` verifies that, and
 `python scripts/rls_all.py preflight|apply [--execute]|verify|rollback --execute` runs a step on every config in
 turn (it checks first and stops at the first failure). Configs are git-ignored (`scripts/teams*.yaml`) because they
