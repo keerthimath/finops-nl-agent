@@ -103,17 +103,18 @@ Re-run the count immediately. If it dropped, roll back (step 7).
 ```
 
 ## Before adding teams (not needed while only admins have access)
-RLS filters the eight final tables (see Option A). Before giving any team Database Viewer, close this, or team
-members can read other teams' data directly in ADX (the chat app's guard only allows `Costs_v1_2()` and `Recommendations()`, so
-the app itself is not affected):
-- **Raw tables in `Ingestion`** (`Costs_raw` and the other `*_raw` tables) hold the same rows unfiltered. RLS can't
-  be enabled on `Costs_raw` (it is the source of an update policy without a managed identity). Options: turn on
-  the restricted view access policy on the raw tables (only admins / Unrestricted Viewers can then query them;
-  confirm it doesn't affect ingestion in Microsoft's docs and on a test table first), or don't grant Viewer on
-  `Ingestion` and check that the Hub functions still work for team members.
-- Then add the teams to **all eight** configs and re-run `apply --execute` for each (it re-creates the functions
-  and grants Viewer). Check the `SubAccountId` format in each table first (`<table> | distinct SubAccountId`): the
-  team lists must match it.
+RLS filters the eight final tables (see Option A). Checked with a test team on 2026-10-24 (rollout log below):
+- **Team members need Viewer on both `Hub` and `Ingestion`.** The `Hub` functions (`Costs()` etc.) read the
+  `Ingestion` tables as the caller; with Viewer on `Hub` only, queries fail with
+  `SEM0056 ... Database='Ingestion': Access denied`. Keep `viewer_databases: [Hub, Ingestion]`.
+- **Raw tables (`*_raw` in `Ingestion`) hold no data while raw retention is 0 days** (the hub default,
+  `dataExplorerRawRetentionInDays = 0`; check with `.show table * policy retention | where EntityName has '_raw'`,
+  `SoftDeletePeriod` `00:00:00`). Then Viewer on `Ingestion` exposes nothing unfiltered. If raw retention is above 0,
+  protect the raw tables first (restricted view access policy; RLS can't be enabled on them while they feed update
+  policies without a managed identity) and test a full ingestion run.
+- Add the team to **all eight** configs (one entry per team: an Entra group and all its subscriptions) and run
+  `rls_all.py apply --execute`. Preflight passes on empty tables; for the others the `SubAccountId` strings must
+  match the data.
 
 ## Common problems
 | Symptom | Likely cause |
@@ -127,7 +128,8 @@ the app itself is not affected):
 
 ## Notes
 - First run against a live cluster on 2026-10-10 (admins only; see "Rollout log"). The team path (team functions
-  with subscriptions, Viewer grants, verifying as a team member) has not been exercised yet: treat the first team
+  with subscriptions, Viewer grants, verifying as a team member) was exercised on 2026-10-24 with a temporary test
+  team (see its rollout log); a real team's first rollout should still be verified by a member: treat the first team
   rollout as a rehearsal.
 - RLS filters rows only. Anyone with Viewer can still call functions that read other tables, so keep the
   database limited to FinOps data.
@@ -305,3 +307,38 @@ Note: `Costs_final_v1_2` grew from 406 rows (first rollout) to 477, so hub inges
 
 **Undo**: remove the line from all configs, `python scripts/rls_all.py apply --execute`, then
 `.drop database ['Ingestion'] viewers ('aadapp=<alerts>;<tenant>')`.
+
+## Rollout log: 2026-10-24, team-path test (temporary team, removed after)
+Goal: prove a team member sees only their team's subscriptions. Identifiers are placeholders: `<tenant>`,
+`<subscription>`, `<test-group>`, `<test-user>`. Exact output: `scripts/rls_rollout_2026-10-24_rls-test-team.log`
+and `scripts/rls_rollout_2026-10-24_restore-admins-only.log` (git-ignored).
+```bash
+# 0. Test identity: user <test-user> (temporary password), group <test-group>, user added as member
+az ad user create --display-name "FinOps RLS test" --user-principal-name <test-user> --password <temp> --force-change-password-next-sign-in true
+az ad group create --display-name finops-rls-test-team --mail-nickname finops-rls-test-team
+az ad group member add --group <test-group> --member-id <test-user-object-id>
+# 1. All eight configs: teams = [{name: rls-test, principals: [aadgroup=<test-group>;<tenant>], subscriptions: [/subscriptions/<subscription>]}]
+python scripts/rls_all.py check        # 8 configs agree
+python scripts/rls_all.py preflight    # ok on Costs_final_v1_2 (999 rows); 7 empty tables pass (after the empty-table fix)
+python scripts/rls_all.py apply        # dry run reviewed with the user
+# 2. Phase 1a: viewer_databases [Hub] only
+python scripts/rls_all.py apply --execute   # admin counts unchanged (999 / 0)
+#    As <test-user> in Hub: Costs() -> SEM0056 "Database='Ingestion': Access denied"  => Hub functions need Ingestion
+# 3. Phase 1b: viewer_databases [Hub, Ingestion]
+python scripts/rls_all.py apply --execute
+#    As <test-user>: Costs() by SubAccountId -> 1 row: <subscription>, 999 rows, 98.24 USD (= admin baseline)
+#                    database('Ingestion').Costs_raw | count -> 0 (raw retention 0 days)
+# 4. Phase 2: team subscription changed to a made-up /subscriptions/11111111-0000-0000-0000-000000000000
+python scripts/rls_all.py apply --execute
+#    As <test-user>: Costs() by SubAccountId -> no rows (no error)
+# 5. Evidence before cleanup: .show queries (test user's 6 queries with outcome and result row counts), RLS
+#    policies (8 enabled), function body, grants, raw retention, admin baseline -> saved privately.
+# 6. Cleanup: configs restored to teams: [] and applied (admin counts unchanged); grants revoked; identities deleted
+.drop database ['Hub'] viewers ('aadgroup=<test-group>;<tenant>')
+.drop database ['Ingestion'] viewers ('aadgroup=<test-group>;<tenant>')
+az ad user delete --id <test-user-object-id>
+az ad group delete --group <test-group>
+```
+Result: team scoping works (same user, same roles: the team's subscription, then nothing when the team doesn't own
+it); team members need Viewer on both databases; raw tables expose nothing at the default 0-day raw retention. State
+after: RLS admins-only on all eight tables (unchanged from before the test).

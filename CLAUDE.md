@@ -36,9 +36,10 @@ runbook's table, the latest rollout log, and `scripts/teams.example.yaml`, then 
 
 A **team** = one Entra group + the subscriptions its members may see (in the app, the dashboard and ADX). An **admin**
 (in `allow_all`) sees everything. Sequence with the user when they ask to add a team:
-0. **Once, before the first team:** close the raw-tables gap (runbook "Before adding teams"). Test first whether team
-   members can work without Viewer on `Ingestion`; otherwise use restricted view access on the `*_raw` tables. Agree
-   the option with the user, apply, and log it.
+0. **Once, before the first team:** check raw retention (runbook "Before adding teams"). At the default 0 days the
+   `*_raw` tables hold no data, so no extra step; if it's above 0, agree with the user how to protect them
+   (restricted view access) and test a full ingestion run. Team members need Viewer on both `Hub` and `Ingestion`
+   (verified 2026-10-24: `Hub` functions read `Ingestion` as the caller).
 1. **User:** creates the Entra group, adds members, and says which subscriptions it owns. Offer the exact values from
    `Costs_v1_2() | distinct SubAccountId, SubAccountName` (in `Hub`).
 2. **Agent:** adds the team to all configs, runs `check`, `preflight` and the `apply` dry run, and shows the user the
