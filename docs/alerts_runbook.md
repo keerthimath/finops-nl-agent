@@ -112,7 +112,7 @@ Some mail providers silently drop these messages although Azure sent them; if on
 python scripts/alerts.py disable [<rule> ...]   # stop: no runs, no emails; definitions, identity, action group kept
 python scripts/alerts.py enable  [<rule> ...]   # restart
 ```
-State: all three rules **disabled on 2026-10-10** at the user's request, after confirming emails arrive (Outlook).
+State: all three rules **disabled on 2026-10-10** at the user's request, after confirming emails arrive.
 
 ## Remove a rule or everything
 ```bash

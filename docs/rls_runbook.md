@@ -314,10 +314,10 @@ Goal: prove a team member sees only their team's subscriptions. Identifiers are 
 and `scripts/rls_rollout_2026-10-24_restore-admins-only.log` (git-ignored).
 ```bash
 # 0. Test identity: user <test-user> (temporary password), group <test-group>, user added as member
-az ad user create --display-name "FinOps RLS test" --user-principal-name <test-user> --password <temp> --force-change-password-next-sign-in true
-az ad group create --display-name finops-rls-test-team --mail-nickname finops-rls-test-team
+az ad user create --display-name "<test-user-name>" --user-principal-name <test-user> --password <temp> --force-change-password-next-sign-in true
+az ad group create --display-name <test-group-name> --mail-nickname <test-group-name>
 az ad group member add --group <test-group> --member-id <test-user-object-id>
-# 1. All eight configs: teams = [{name: rls-test, principals: [aadgroup=<test-group>;<tenant>], subscriptions: [/subscriptions/<subscription>]}]
+# 1. All eight configs: teams = [{name: <test-team>, principals: [aadgroup=<test-group>;<tenant>], subscriptions: [/subscriptions/<subscription>]}]
 python scripts/rls_all.py check        # 8 configs agree
 python scripts/rls_all.py preflight    # ok on Costs_final_v1_2 (999 rows); 7 empty tables pass (after the empty-table fix)
 python scripts/rls_all.py apply        # dry run reviewed with the user
