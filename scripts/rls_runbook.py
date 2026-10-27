@@ -134,9 +134,20 @@ def preflight(runner, p: gen_rls.Plan, cfg: dict) -> int:
     return 1 if problems else 0
 
 
+def _policy(runner, p: gen_rls.Plan) -> dict | None:
+    """The table's RLS policy as stored ({"IsEnabled": bool, "Query": str}), or None if it has none."""
+    rows = runner.run(p.table_db, f".show table {p.table} policy row_level_security")
+    raw = rows[0].get("Policy") if rows else None
+    if not raw or raw == "null":
+        return None
+    return json.loads(raw) if isinstance(raw, str) else raw
+
+
 def apply(runner, p: gen_rls.Plan, execute: bool, force: bool) -> int:
     steps = [
         (p.table_db, gen_rls.function_command(p), "Create the RLS function (does nothing until enabled)"),
+        (p.table_db, gen_rls.disable_command(p),
+         "Attach it as a DISABLED policy (only if no policy is enabled yet), so forced RLS really applies it"),
         (p.table_db, _count_query(p, True), "Dry-run the function on you: forced RLS must see the same rows as no RLS"),
         (p.table_db, gen_rls.enable_command(p), "Enable the policy"),
         (p.table_db, _count_query(p, False), "Re-check: you must still see all rows (else auto-rollback)"),
@@ -150,6 +161,17 @@ def apply(runner, p: gen_rls.Plan, execute: bool, force: bool) -> int:
 
     _step(1, "Create the RLS function")
     runner.run(p.table_db, gen_rls.function_command(p))
+    # `set query_force_row_level_security` only applies a policy attached to the table. Without one (first rollout),
+    # the comparison below would always match and prove nothing, so attach the function as a disabled policy first.
+    # An already enabled policy stays enabled (disabling it would expose every row while we test).
+    current = _policy(runner, p)
+    if current is None or not current.get("IsEnabled"):
+        runner.run(p.table_db, gen_rls.disable_command(p))
+        print("    attached as a disabled policy (affects no one; forced RLS applies it to your queries)")
+    elif str(current.get("Query", "")).replace(" ", "") != f"{p.fn}()":
+        print(f"    ABORT: an enabled policy uses a different query ({current.get('Query')}); the forced test would "
+              f"not exercise {p.fn}(). Review it, then disable it or point it at {p.fn}() before re-running.")
+        return 1
     _step(2, "Compare rows seen with and without forced RLS")
     plain = _count(runner, p, force=False)
     forced = _count(runner, p, force=True)

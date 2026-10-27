@@ -1,3 +1,4 @@
+import json
 import contextlib
 import io
 import sys
@@ -23,11 +24,13 @@ teams:
 class FakeRunner:
     """counts: scripted (rows, subs) results for each count query, in order."""
 
-    def __init__(self, counts):
-        self.counts, self.calls = list(counts), []
+    def __init__(self, counts, policy=None):
+        self.counts, self.calls, self.policy = list(counts), [], policy
 
     def run(self, db, text):
         self.calls.append((db, text))
+        if "policy row_level_security" in text and text.startswith(".show"):
+            return [{"Policy": json.dumps(self.policy) if self.policy else "null"}]
         if "summarize Rows=count()" in text:
             r, s = self.counts.pop(0)
             return [{"Rows": r, "Subs": s}]
@@ -71,6 +74,29 @@ class RunbookTests(unittest.TestCase):
         self.assertEqual(len(grants), 4)  # 2 teams x 2 databases
         self.assertTrue(all(db == "Ingestion" for db, x in r.calls if "row_level_security" in x))
 
+    def test_first_rollout_attaches_a_disabled_policy_before_the_forced_test(self):
+        r = FakeRunner([(100, 5), (100, 5), (100, 5)])  # no policy yet: forced RLS would otherwise prove nothing
+        code, _ = run_main(["apply", "--cluster", "https://x", "--execute"], r)
+        self.assertEqual(code, 0)
+        c = cmds(r)
+        attach = next(i for i, x in enumerate(c) if "row_level_security disable" in x)
+        forced = next(i for i, x in enumerate(c) if x.startswith("set query_force_row_level_security"))
+        enable = next(i for i, x in enumerate(c) if "row_level_security enable" in x)
+        self.assertTrue(attach < forced < enable)
+
+    def test_enabled_policy_stays_enabled_while_testing(self):
+        r = FakeRunner([(100, 5), (100, 5), (100, 5)], policy={"IsEnabled": True, "Query": "FinopsRls_Costs()"})
+        code, _ = run_main(["apply", "--cluster", "https://x", "--execute"], r)
+        self.assertEqual(code, 0)
+        self.assertFalse(any("row_level_security disable" in x for x in cmds(r)))  # never switched off
+
+    def test_enabled_policy_with_another_query_aborts(self):
+        r = FakeRunner([], policy={"IsEnabled": True, "Query": "SomeOtherFunction()"})
+        code, out = run_main(["apply", "--cluster", "https://x", "--execute"], r)
+        self.assertEqual(code, 1)
+        self.assertIn("different query", out)
+        self.assertFalse(any(x.startswith("set query_force") or "enable" in x for x in cmds(r)))
+
     def test_aborts_before_enable_if_function_hides_rows_from_you(self):
         r = FakeRunner([(100, 5), (0, 0)])
         code, out = run_main(["apply", "--cluster", "https://x", "--execute"], r)
@@ -84,7 +110,8 @@ class RunbookTests(unittest.TestCase):
         code, out = run_main(["apply", "--cluster", "https://x", "--execute"], r)
         self.assertEqual(code, 1)
         c = cmds(r)
-        self.assertTrue(any("row_level_security disable" in x for x in c))
+        enable = next(i for i, x in enumerate(c) if "row_level_security enable" in x)
+        self.assertTrue(any("row_level_security disable" in x for x in c[enable:]))  # rolled back after enabling
         self.assertFalse(any(x.startswith(".add database") for x in c))
         self.assertIn("Rolling back", out)
 

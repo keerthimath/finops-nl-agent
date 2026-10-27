@@ -47,7 +47,9 @@ recommendations) match no team, so only `allow_all` sees them.
 
 In zsh, keep `--execute` as its own argument: a variable holding `apply --execute` is passed as one word and the
 script rejects it (nothing runs).
-What `apply --execute` does: creates the function, compares the rows you see with and without forced RLS
+What `apply --execute` does: creates the function; if the table has no enabled policy yet, attaches the function as
+a **disabled** policy (forced RLS only applies a policy that's attached; an already enabled policy is left enabled);
+compares the rows you see with and without forced RLS
 (`set query_force_row_level_security;`) and **aborts if they differ**, enables the policy, re-counts and
 **auto-disables if your row count changed**, then grants Database Viewer to the team groups.
 `--force` skips those checks; avoid it.
@@ -72,8 +74,11 @@ policy is on; a materialized view uses the table (it needs its own RLS, or enabl
 **2. Create the function (database `Ingestion`)**: generate it with `python scripts/gen_rls.py scripts/teams.yaml`
 and run the `.create-or-alter function` block. It does nothing until the policy is enabled.
 
-**3. Dry-run it on yourself (database `Ingestion`)**: both counts must match.
+**3. Dry-run it on yourself (database `Ingestion`)**: both counts must match. On a table with no RLS policy yet, first
+attach the function as a disabled policy; otherwise forced RLS has nothing to apply and the counts always match. Skip
+the attach if the policy is already enabled (disabling it would expose every row while you test).
 ```kusto
+.alter table <table> policy row_level_security disable "FinopsRls_Costs()"
 <table> | summarize Rows=count()
 set query_force_row_level_security;
 <table> | summarize Rows=count()
