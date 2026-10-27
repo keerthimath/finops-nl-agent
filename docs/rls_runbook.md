@@ -138,7 +138,7 @@ RLS filters the eight final tables (see Option A). Checked with a test team on 2
 ## Rollout log: 2026-10-10, first rollout (admins only)
 Every command run, in order. Identifiers are placeholders here: `<cluster>` is the ADX cluster URI, `<tenant>` the
 Entra tenant id, `<admin>` the admin's user object id, `<engine>` the hub ingestion engine's app id. The exact log with
-real values and full output is kept locally in `scripts/rls_rollout_2026-10-10.log` (git-ignored).
+real values and full output is kept locally in `scripts/local/rollout-logs/rls_rollout_2026-10-10.log` (git-ignored).
 
 Decision: **admins only**. One subscription and one user today, so `allow_all` = the FinOps admin and the hub
 ingestion engine, and `teams: []`. Anyone else who is later given Viewer sees no cost rows until added to a team.
@@ -221,7 +221,7 @@ python scripts/rls_runbook.py rollback scripts/teams_v1_0.yaml --execute
 ```
 
 ## Rollout log: 2026-10-10, other final tables (admins only)
-Same decision, identifiers and placeholders as the first rollout. Exact log: `scripts/rls_rollout_2026-10-10_other_tables.log`
+Same decision, identifiers and placeholders as the first rollout. Exact log: `scripts/local/rollout-logs/rls_rollout_2026-10-10_other_tables.log`
 (git-ignored).
 
 **1. Discovery (read-only, database `Ingestion`)**, for each of `Recommendations_final_v1_2`, `Recommendations_final_v1_0`,
@@ -281,7 +281,7 @@ CommitmentDiscountUsage_v1_2() | count
 Why: Azure Monitor alert rules (see `docs/alerts_runbook.md`) query the hub with no user, as the user-assigned managed
 identity `finops-alerts-id`. Decision (user): it may see **all data**, so it goes in `allow_all`. `<alerts>` = its client
 id (`az identity show -g <rg> -n finops-alerts-id --query clientId -o tsv`). Exact log:
-`scripts/rls_rollout_2026-10-10_alerts_identity.log` (git-ignored).
+`scripts/local/rollout-logs/rls_rollout_2026-10-10_alerts_identity.log` (git-ignored).
 
 **1. Config**: added `- "aadapp=<alerts>;<tenant>"` to `allow_all` in all eight `scripts/teams*.yaml`.
 ```bash
@@ -310,8 +310,8 @@ Note: `Costs_final_v1_2` grew from 406 rows (first rollout) to 477, so hub inges
 
 ## Rollout log: 2026-10-24, team-path test (temporary team, removed after)
 Goal: prove a team member sees only their team's subscriptions. Identifiers are placeholders: `<tenant>`,
-`<subscription>`, `<test-group>`, `<test-user>`. Exact output: `scripts/rls_rollout_2026-10-24_rls-test-team.log`
-and `scripts/rls_rollout_2026-10-24_restore-admins-only.log` (git-ignored).
+`<subscription>`, `<test-group>`, `<test-user>`. Exact output: `scripts/local/rollout-logs/rls_rollout_2026-10-24_rls-test-team.log`
+and `scripts/local/rollout-logs/rls_rollout_2026-10-24_restore-admins-only.log` (git-ignored).
 ```bash
 # 0. Test identity: user <test-user> (temporary password), group <test-group>, user added as member
 az ad user create --display-name "<test-user-name>" --user-principal-name <test-user> --password <temp> --force-change-password-next-sign-in true

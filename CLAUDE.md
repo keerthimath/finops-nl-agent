@@ -70,7 +70,8 @@ Procedure for every RLS change (it changes who can see cost data, so confirm wit
    proven when a team member checks `Costs_v1_2() | summarize by SubAccountId` themselves.
 5. Document: add a "Rollout log: <date>, <change>" section to `docs/rls_runbook.md` with every command run, in order,
    with results, ids replaced by placeholders (`<admin>`, `<engine>`, `<tenant>`, `<cluster>`, `<group>`). Save the exact
-   output to `scripts/rls_rollout_<date>_<change>.log` (git-ignored). Never commit real ids.
+   output to `scripts/local/rollout-logs/rls_rollout_<date>_<change>.log` (git-ignored); back up configs before a
+   change to `scripts/local/config-backups/<date>-<change>/`. Never commit real ids.
 
 Disable (all tables): `rls_all.py rollback --execute`. Re-enable: `rls_all.py apply --execute`. One table only:
 `python scripts/rls_runbook.py rollback|apply scripts/teams_<Name>_<ver>.yaml --execute`.

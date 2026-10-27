@@ -17,3 +17,6 @@ scripts/.alert-*.json
 
 # Local backups of RLS configs (hold object ids)
 scripts/*.bak*
+
+# Local RLS rollout logs and config backups (hold real ids): scripts/local/{rollout-logs,config-backups}
+scripts/local/
